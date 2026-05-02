@@ -1,0 +1,586 @@
+import 'dart:async';
+import 'dart:math';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../providers/auth_provider.dart';
+import '../providers/reminder_provider.dart';
+import '../models/reminder_model.dart';
+import '../services/ai_service.dart';
+import '../services/sensor_service.dart';
+import '../services/location_service.dart';
+import '../services/notification_service.dart';
+import '../core/app_theme.dart';
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  String _searchQuery = '';
+  StreamSubscription? _shakeSub;
+  StreamSubscription? _tiltSub;
+
+  @override
+  void initState() {
+    super.initState();
+    SensorService.init();
+    _shakeSub = SensorService.onShake.listen((_) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Goncangan terdeteksi! Memperbarui...'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppTheme.secondary,
+        ),
+      );
+      _refresh();
+    });
+    _tiltSub = SensorService.onTilt.listen((val) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Kemiringan terdeteksi: ${val > 0 ? "Kanan" : "Kiri"}'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppTheme.primary,
+        ),
+      );
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
+  }
+
+  void _refresh() {
+    final pengguna = Provider.of<AuthProvider>(context, listen: false).penggunaSaatIni;
+    if (pengguna != null) Provider.of<PengingatProvider>(context, listen: false).ambilPengingat(pengguna.id!);
+  }
+
+  void _showAISummary() async {
+    final pengingatProvider = Provider.of<PengingatProvider>(context, listen: false);
+    final daftarTugas = pengingatProvider.daftarPengingat.map((r) => r.judul).toList();
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator(color: AppTheme.primary)),
+    );
+
+    final summary = await AIService.getTaskSummary(daftarTugas);
+    
+    if (mounted) {
+      Navigator.pop(context);
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppTheme.background,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: const [
+              Icon(Icons.auto_awesome, color: AppTheme.primary),
+              SizedBox(width: 10),
+              Text('Ringkasan Pintar'),
+            ],
+          ),
+          content: Text(summary, style: const TextStyle(height: 1.5)),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 20)),
+              child: const Text('Mengerti!'),
+            )
+          ],
+        ),
+      );
+    }
+  }
+
+  void _showAddReminderDialog(BuildContext context, int idPengguna) async {
+    final judulController = TextEditingController();
+    final deskripsiController = TextEditingController();
+    String lokasiStr = 'Mengambil lokasi...';
+    DateTime? selectedDeadline;
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          if (lokasiStr == 'Mengambil lokasi...') {
+            LocationService.getCurrentLocation().then((pos) async {
+              if (pos != null) {
+                final address = await LocationService.getAddressFromLatLng(pos);
+                if (mounted) {
+                  setDialogState(() {
+                    lokasiStr = address;
+                  });
+                }
+              } else {
+                if (mounted) {
+                  setDialogState(() {
+                    lokasiStr = 'Lokasi tidak tersedia';
+                  });
+                }
+              }
+            });
+          }
+
+          return AlertDialog(
+            backgroundColor: AppTheme.background,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Text('Pengingat Baru'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: judulController,
+                    decoration: const InputDecoration(hintText: 'Apa yang perlu dilakukan?'),
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: deskripsiController,
+                    maxLines: 3,
+                    decoration: const InputDecoration(hintText: 'Tambah detail...'),
+                  ),
+                  const SizedBox(height: 15),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.calendar_today, color: AppTheme.primary),
+                    title: Text(
+                      selectedDeadline == null ? 'Set Tenggat Waktu (Opsional)' : 'Deadline: ${DateFormat('dd MMM yyyy, HH:mm').format(selectedDeadline!)}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: selectedDeadline == null ? AppTheme.onSurface.withOpacity(0.5) : AppTheme.primary,
+                        fontWeight: selectedDeadline == null ? FontWeight.normal : FontWeight.bold,
+                      ),
+                    ),
+                    onTap: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                      );
+                      if (date != null && mounted) {
+                        final time = await showTimePicker(
+                          context: context,
+                          initialTime: TimeOfDay.now(),
+                        );
+                        if (time != null) {
+                          final picked = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+                          if (picked.isBefore(DateTime.now())) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Tenggat waktu tidak boleh di masa lalu!')),
+                              );
+                            }
+                          } else {
+                            setDialogState(() => selectedDeadline = picked);
+                          }
+                        }
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.primary.withOpacity(0.1)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.location_on_outlined, size: 16, color: AppTheme.primary),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(lokasiStr, style: const TextStyle(fontSize: 12, color: AppTheme.primary))),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+              ElevatedButton(
+                  onPressed: () async {
+                  if (judulController.text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Judul tidak boleh kosong!')));
+                    return;
+                  }
+
+                  // Guard: reject past deadlines before saving
+                  if (selectedDeadline != null && selectedDeadline!.isBefore(DateTime.now())) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tenggat waktu tidak boleh di masa lalu!')));
+                    return;
+                  }
+                  
+                  try {
+                    final selectedDate = DateTime.now().add(const Duration(seconds: 10));
+                    final pengingat = Pengingat(
+                      idPengguna: idPengguna,
+                      judul: judulController.text,
+                      deskripsi: deskripsiController.text,
+                      waktu: selectedDate,
+                      lokasi: lokasiStr == 'Mengambil lokasi...' ? 'Lokasi tidak diketahui' : lokasiStr,
+                      deadline: selectedDeadline,
+                    );
+                    
+                    await Provider.of<PengingatProvider>(context, listen: false).tambahPengingat(pengingat);
+                    
+                    final notificationId = Random().nextInt(1000);
+                    try {
+                      // Deadline notification — only if deadline is still in the future
+                      if (selectedDeadline != null && selectedDeadline!.isAfter(DateTime.now())) {
+                        final msg = await NotificationService.scheduleDeadlineNotifications(
+                          id: notificationId + 2000,
+                          title: judulController.text,
+                          deadline: selectedDeadline!,
+                        );
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text('✓ $msg'),
+                            backgroundColor: Colors.green,
+                            behavior: SnackBarBehavior.floating,
+                            duration: const Duration(seconds: 4),
+                          ));
+                        }
+                      }
+                    } catch (e) {
+                      debugPrint('Gagal menampilkan notifikasi: $e');
+                    }
+                    
+                    if (mounted) Navigator.pop(ctx);
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal menambahkan tugas: $e')));
+                    }
+                  }
+                },
+                child: const Text('Buat'),
+              ),
+            ],
+          );
+        }
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _shakeSub?.cancel();
+    _tiltSub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pengingatProvider = Provider.of<PengingatProvider>(context);
+    final pengguna = Provider.of<AuthProvider>(context).penggunaSaatIni;
+
+    final daftarTerfilter = pengingatProvider.daftarPengingat.where((r) {
+      return r.judul.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+             r.deskripsi.toLowerCase().contains(_searchQuery.toLowerCase());
+    }).toList();
+
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      appBar: AppBar(
+        backgroundColor: AppTheme.background,
+        elevation: 0,
+        centerTitle: false,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Halo,', style: TextStyle(fontSize: 14, color: AppTheme.onSurface.withOpacity(0.5))),
+            Text(pengguna?.namaPengguna ?? "Pengguna", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 24)),
+          ],
+        ),
+        actions: [
+          // 🔔 DEBUG: Tap to send an immediate test notification
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: IconButton(
+              tooltip: 'Test Notifikasi',
+              icon: const Icon(Icons.notifications_active_outlined, color: AppTheme.primary),
+              onPressed: () async {
+                final ok = await NotificationService.showImmediateNotification(
+                  title: '🔔 Test Notifikasi',
+                  body: 'Jika ini muncul, sistem notifikasi berfungsi dengan baik!',
+                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(ok
+                      ? '✓ Notifikasi dikirim! Cek status bar kamu.'
+                      : '✗ Gagal mengirim notifikasi. Cek izin aplikasi.'),
+                    backgroundColor: ok ? Colors.green : Colors.red,
+                    behavior: SnackBarBehavior.floating,
+                  ));
+                }
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 15),
+            child: GestureDetector(
+              onTap: _showAISummary,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.auto_awesome, color: AppTheme.primary, size: 20),
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 20),
+            TextField(
+              onChanged: (val) => setState(() => _searchQuery = val),
+              decoration: InputDecoration(
+                hintText: 'Cari fokusmu...',
+                prefixIcon: const Icon(Icons.search, color: AppTheme.primary),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(15),
+                  borderSide: BorderSide(color: AppTheme.outline.withOpacity(0.1), width: 1.5),
+                ),
+              ),
+            ),
+            const SizedBox(height: 30),
+            _SectionHeader(count: daftarTerfilter.length),
+            const SizedBox(height: 20),
+            Expanded(
+              child: pengingatProvider.sedangMemuat
+                  ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
+                  : daftarTerfilter.isEmpty
+                      ? const _EmptyState()
+                      : RepaintBoundary(
+                          child: ListView.builder(
+                            padding: const EdgeInsets.only(bottom: 100),
+                            itemCount: daftarTerfilter.length,
+                            addRepaintBoundaries: true,
+                            addAutomaticKeepAlives: false,
+                            itemBuilder: (context, index) {
+                              return _ReminderCard(
+                                key: ValueKey(daftarTerfilter[index].id),
+                                pengingat: daftarTerfilter[index],
+                              );
+                            },
+                          ),
+                        ),
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showAddReminderDialog(context, pengguna!.id!),
+        backgroundColor: AppTheme.primary,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        label: const Text('Tambah Tugas', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        icon: const Icon(Icons.add, color: Colors.white),
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final int count;
+  const _SectionHeader({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text('Tugas Berjalan', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 20)),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppTheme.secondary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            '$count Total',
+            style: const TextStyle(color: AppTheme.secondary, fontWeight: FontWeight.bold, fontSize: 12),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.wb_sunny_outlined, size: 80, color: AppTheme.primary.withOpacity(0.2)),
+          const SizedBox(height: 20),
+          Text(
+            'Belum ada tugas yang difokuskan.',
+            style: TextStyle(color: AppTheme.onSurface.withOpacity(0.4), fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReminderCard extends StatelessWidget {
+  final Pengingat pengingat;
+  const _ReminderCard({super.key, required this.pengingat});
+
+  void _showDetail(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.background,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(pengingat.judul, style: const TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(pengingat.deskripsi, style: const TextStyle(fontSize: 16)),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                const Icon(Icons.location_on_outlined, size: 16, color: AppTheme.primary),
+                const SizedBox(width: 8),
+                Expanded(child: Text(pengingat.lokasi ?? 'Tanpa Lokasi', style: const TextStyle(fontSize: 12, color: AppTheme.primary))),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Icon(Icons.schedule_outlined, size: 16, color: AppTheme.onSurface),
+                const SizedBox(width: 8),
+                Text(pengingat.waktu.toString().split('.')[0], style: const TextStyle(fontSize: 12)),
+              ],
+            ),
+            if (pengingat.deadline != null) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const Icon(Icons.event_busy, size: 16, color: Colors.redAccent),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Deadline: ${DateFormat('dd MMM yyyy, HH:mm').format(pengingat.deadline!)}',
+                    style: const TextStyle(fontSize: 12, color: Colors.redAccent, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Tutup')),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _showDetail(context),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppTheme.outline.withOpacity(0.1), width: 1.5),
+        ),
+        child: IntrinsicHeight(
+          child: Row(
+            children: [
+              Container(
+                width: 6,
+                decoration: const BoxDecoration(
+                  color: AppTheme.primary,
+                  borderRadius: BorderRadius.only(topLeft: Radius.circular(20), bottomLeft: Radius.circular(20)),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        pengingat.judul,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: AppTheme.onSurface),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        pengingat.deskripsi,
+                        style: TextStyle(color: AppTheme.onSurface.withOpacity(0.6), fontSize: 14, height: 1.4),
+                      ),
+                      if (pengingat.lokasi != null) ...[
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            const Icon(Icons.location_on, size: 14, color: AppTheme.secondary),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                pengingat.lokasi!,
+                                style: const TextStyle(fontSize: 12, color: AppTheme.secondary, fontWeight: FontWeight.w500),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      if (pengingat.deadline != null) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.timer_outlined, size: 12, color: Colors.redAccent),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Deadline: ${DateFormat('dd MMM').format(pengingat.deadline!)}',
+                                style: const TextStyle(fontSize: 11, color: Colors.redAccent, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: () {
+                  Provider.of<PengingatProvider>(context, listen: false).hapusPengingat(pengingat.id!, pengingat.idPengguna);
+                },
+                icon: Icon(Icons.delete_outline, color: Colors.redAccent.withOpacity(0.3)),
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
