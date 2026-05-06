@@ -12,6 +12,8 @@ import '../services/sensor_service.dart';
 import '../services/location_service.dart';
 import '../services/notification_service.dart';
 import '../core/app_theme.dart';
+import '../core/snackbar_utils.dart';
+import 'ai_chat_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -30,23 +32,11 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     SensorService.init();
     _shakeSub = SensorService.onShake.listen((_) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Goncangan terdeteksi! Memperbarui...'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: AppTheme.secondary,
-        ),
-      );
+      SnackBarUtils.showSuccess(context, 'Goncangan terdeteksi! Memperbarui...');
       _refresh();
     });
     _tiltSub = SensorService.onTilt.listen((val) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Kemiringan terdeteksi: ${val > 0 ? "Kanan" : "Kiri"}'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: AppTheme.primary,
-        ),
-      );
+      SnackBarUtils.showSuccess(context, 'Kemiringan terdeteksi: ${val > 0 ? "Kanan" : "Kiri"}');
     });
     WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
   }
@@ -56,43 +46,10 @@ class _HomeScreenState extends State<HomeScreen> {
     if (pengguna != null) Provider.of<PengingatProvider>(context, listen: false).ambilPengingat(pengguna.id!);
   }
 
-  void _showAISummary() async {
+  void _openAIChat() {
     final pengingatProvider = Provider.of<PengingatProvider>(context, listen: false);
     final daftarTugas = pengingatProvider.daftarPengingat.map((r) => r.judul).toList();
-    
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => const Center(child: CircularProgressIndicator(color: AppTheme.primary)),
-    );
-
-    final summary = await AIService.getTaskSummary(daftarTugas);
-    
-    if (mounted) {
-      Navigator.pop(context);
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: AppTheme.background,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: const [
-              Icon(Icons.auto_awesome, color: AppTheme.primary),
-              SizedBox(width: 10),
-              Text('Ringkasan Pintar'),
-            ],
-          ),
-          content: Text(summary, style: const TextStyle(height: 1.5)),
-          actions: [
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx),
-              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 20)),
-              child: const Text('Mengerti!'),
-            )
-          ],
-        ),
-      );
-    }
+    Navigator.push(context, MaterialPageRoute(builder: (_) => AIChatScreen(tasks: daftarTugas)));
   }
 
   void _showAddReminderDialog(BuildContext context, int idPengguna) async {
@@ -170,9 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           final picked = DateTime(date.year, date.month, date.day, time.hour, time.minute);
                           if (picked.isBefore(DateTime.now())) {
                             if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Tenggat waktu tidak boleh di masa lalu!')),
-                              );
+                              SnackBarUtils.showError(context, 'Tenggat waktu tidak boleh di masa lalu!');
                             }
                           } else {
                             setDialogState(() => selectedDeadline = picked);
@@ -205,13 +160,13 @@ class _HomeScreenState extends State<HomeScreen> {
               ElevatedButton(
                   onPressed: () async {
                   if (judulController.text.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Judul tidak boleh kosong!')));
+                    SnackBarUtils.showError(context, 'Judul tidak boleh kosong!');
                     return;
                   }
 
                   // Guard: reject past deadlines before saving
                   if (selectedDeadline != null && selectedDeadline!.isBefore(DateTime.now())) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tenggat waktu tidak boleh di masa lalu!')));
+                    SnackBarUtils.showError(context, 'Tenggat waktu tidak boleh di masa lalu!');
                     return;
                   }
                   
@@ -238,12 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           deadline: selectedDeadline!,
                         );
                         if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text('✓ $msg'),
-                            backgroundColor: Colors.green,
-                            behavior: SnackBarBehavior.floating,
-                            duration: const Duration(seconds: 4),
-                          ));
+                          SnackBarUtils.showSuccess(context, msg);
                         }
                       }
                     } catch (e) {
@@ -253,7 +203,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     if (mounted) Navigator.pop(ctx);
                   } catch (e) {
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal menambahkan tugas: $e')));
+                      SnackBarUtils.showError(context, 'Gagal menambahkan tugas: $e');
                     }
                   }
                 },
@@ -309,13 +259,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   body: 'Jika ini muncul, sistem notifikasi berfungsi dengan baik!',
                 );
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text(ok
-                      ? '✓ Notifikasi dikirim! Cek status bar kamu.'
-                      : '✗ Gagal mengirim notifikasi. Cek izin aplikasi.'),
-                    backgroundColor: ok ? Colors.green : Colors.red,
-                    behavior: SnackBarBehavior.floating,
-                  ));
+                  if (ok) {
+                    SnackBarUtils.showSuccess(context, 'Notifikasi dikirim! Cek status bar kamu.');
+                  } else {
+                    SnackBarUtils.showError(context, 'Gagal mengirim notifikasi. Cek izin aplikasi.');
+                  }
                 }
               },
             ),
@@ -323,7 +271,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 15),
             child: GestureDetector(
-              onTap: _showAISummary,
+              onTap: _openAIChat,
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../core/app_theme.dart';
+import '../core/snackbar_utils.dart';
 import 'main_navigation.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -35,7 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
       success = await auth.daftar(_usernameController.text, _passwordController.text);
       if (success) {
         setState(() => _isLogin = true);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pendaftaran berhasil! Silakan masuk.')));
+        SnackBarUtils.showSuccess(context, 'Pendaftaran berhasil! Silakan masuk.');
         return;
       }
     }
@@ -46,7 +47,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Autentikasi gagal!')));
+        SnackBarUtils.showError(context, 'Autentikasi gagal!');
       }
     }
   }
@@ -60,7 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Autentikasi biometrik gagal atau belum diatur!')));
+        SnackBarUtils.showError(context, 'Autentikasi biometrik gagal atau belum diatur!');
       }
     }
   }
