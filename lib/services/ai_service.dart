@@ -9,7 +9,7 @@ class AIService {
 
     try {
       final model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: _apiKey);
-      final prompt = 'Rangkum tugas-tugas berikut dalam Bahasa Indonesia yang santai dan berikan satu tips produktivitas singkat: ${tasks.join(', ')}';
+      final prompt = 'Rangkum tugas-tugas berikut dalam Bahasa Indonesia yang santai dan bersih (tanpa format markdown yang berlebihan) dan berikan satu tips produktivitas singkat: ${tasks.join(', ')}';
       final content = [Content.text(prompt)];
       final response = await model.generateContent(content);
       return response.text ?? 'Gagal menghasilkan rangkuman.';
@@ -22,7 +22,7 @@ class AIService {
     if (_apiKey.isEmpty) return null;
     final model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: _apiKey);
     
-    String prompt = 'Kamu adalah asisten produktivitas di aplikasi RemindMe+. Berbicaralah dalam bahasa Indonesia yang ramah dan membantu. Berikut adalah daftar tugas penggunaku saat ini: ${tasks.isEmpty ? "Belum ada tugas." : tasks.join(', ')}. Gunakan ini sebagai konteks jika pengguna bertanya tentang tugas mereka. Jawab singkat dan solutif.';
+    String prompt = 'Kamu adalah asisten produktivitas di aplikasi RemindMe+. Berbicaralah dalam bahasa Indonesia yang ramah, santai, dan membantu. Berikut adalah daftar tugas penggunaku saat ini: ${tasks.isEmpty ? "Belum ada tugas." : tasks.join(', ')}. Gunakan ini sebagai konteks jika pengguna bertanya tentang tugas mereka. Jawab singkat, solutif, dan hindari penggunaan format Markdown yang berlebihan seperti simbol pagar (#) atau daftar yang terlalu panjang. Gunakan gaya bahasa manusia yang normal dan bersih.';
     
     if (userLocation != null && userLocation.isNotEmpty) {
       prompt += '\n\nINFO LOKASI: Lokasi pengguna saat ini adalah $userLocation. Jika pengguna menyebutkan suatu tempat (seperti "alfamart", "cafe", dll) pada tugasnya, atau meminta rekomendasi tempat terdekat, berikan panduan rute atau saran tempat terdekat dari lokasinya tersebut. Berikan juga tautan Google Maps menggunakan format: https://www.google.com/maps/search/?api=1&query=[NAMA+TEMPAT+SPASI+NAMA+KOTA_ATAU_LOKASI]. Contoh: https://www.google.com/maps/search/?api=1&query=Alfamart+terdekat.';

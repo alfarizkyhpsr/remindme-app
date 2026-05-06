@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'mini_game_screen.dart';
@@ -18,28 +20,42 @@ class _ConversionScreenState extends State<ConversionScreen> {
   double _convertedAmount = 0;
   String _fromCurrency = 'USD';
   String _toCurrency = 'IDR';
+  bool _isLoading = false;
 
-  final Map<String, double> _rates = {
-    'USD_IDR': 15500.0,
-    'IDR_USD': 1 / 15500.0,
-    'USD_EUR': 0.92,
-    'EUR_USD': 1 / 0.92,
-    'USD_JPY': 148.0,
-    'JPY_USD': 1 / 148.0,
-  };
-
-  void _convertCurrency() {
+  Future<void> _convertCurrency() async {
     double amount = double.tryParse(_amountController.text) ?? 0;
+    if (amount <= 0) {
+      setState(() => _convertedAmount = 0);
+      return;
+    }
+
     if (_fromCurrency == _toCurrency) {
       setState(() => _convertedAmount = amount);
       return;
     }
-    String key = '${_fromCurrency}_${_toCurrency}';
-    if (_rates.containsKey(key)) {
-      setState(() => _convertedAmount = amount * _rates[key]!);
-    } else {
-      double amountInUsd = _fromCurrency == 'USD' ? amount : amount * _rates['${_fromCurrency}_USD']!;
-      setState(() => _convertedAmount = amountInUsd * _rates['USD_${_toCurrency}']!);
+
+    setState(() => _isLoading = true);
+
+    try {
+      final response = await http.get(Uri.parse(
+          'https://api.frankfurter.app/latest?amount=$amount&from=$_fromCurrency&to=$_toCurrency'));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          _convertedAmount = (data['rates'][_toCurrency] as num).toDouble();
+          _isLoading = false;
+        });
+      } else {
+        throw Exception('Gagal memuat data kurs');
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Terjadi kesalahan: $e')),
+        );
+      }
     }
   }
 
@@ -108,10 +124,16 @@ class _ConversionScreenState extends State<ConversionScreen> {
                       children: [
                         Text('Hasil Konversi', style: TextStyle(color: AppTheme.onSurface.withOpacity(0.5), fontSize: 12)),
                         const SizedBox(height: 5),
-                        Text(
-                          '${NumberFormat.currency(symbol: '').format(_convertedAmount)} $_toCurrency',
-                          style: GoogleFonts.plusJakartaSans(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.primary),
-                        ),
+                        _isLoading 
+                          ? const SizedBox(
+                              height: 30,
+                              width: 30,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary),
+                            )
+                          : Text(
+                              '${NumberFormat.currency(symbol: '').format(_convertedAmount)} $_toCurrency',
+                              style: GoogleFonts.plusJakartaSans(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                            ),
                       ],
                     ),
                   ),

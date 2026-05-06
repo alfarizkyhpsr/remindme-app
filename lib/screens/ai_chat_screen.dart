@@ -5,6 +5,7 @@ import '../services/ai_service.dart';
 import '../services/location_service.dart';
 import '../core/app_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 class AIChatScreen extends StatefulWidget {
   final List<String> tasks;
@@ -252,13 +253,23 @@ class _AIChatScreenState extends State<AIChatScreen> {
       }
     }
     
-    return SelectableText(
-      msg.text,
-      style: TextStyle(
-        color: msg.isUser ? Colors.white : AppTheme.onSurface,
-        fontSize: 15,
-        height: 1.4,
+    return MarkdownBody(
+      data: msg.text,
+      styleSheet: MarkdownStyleSheet(
+        p: TextStyle(
+          color: msg.isUser ? Colors.white : AppTheme.onSurface,
+          fontSize: 15,
+          height: 1.4,
+        ),
+        strong: TextStyle(
+          color: msg.isUser ? Colors.white : AppTheme.onSurface,
+          fontWeight: FontWeight.bold,
+        ),
+        listBullet: TextStyle(
+          color: msg.isUser ? Colors.white : AppTheme.onSurface,
+        ),
       ),
+      selectable: true,
     );
   }
 }
