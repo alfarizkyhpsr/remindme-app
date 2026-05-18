@@ -7,12 +7,13 @@ import 'package:google_fonts/google_fonts.dart';
 import '../providers/auth_provider.dart';
 import '../providers/reminder_provider.dart';
 import '../models/reminder_model.dart';
-import '../services/ai_service.dart';
 import '../services/sensor_service.dart';
 import '../services/location_service.dart';
 import '../services/notification_service.dart';
+import '../services/task_priority_service.dart';
 import '../core/app_theme.dart';
 import '../core/snackbar_utils.dart';
+import '../services/ai_service.dart';
 import 'ai_chat_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -48,7 +49,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _openAIChat() {
     final pengingatProvider = Provider.of<PengingatProvider>(context, listen: false);
-    final daftarTugas = pengingatProvider.daftarPengingat.map((r) => r.judul).toList();
+    final daftarTugas = pengingatProvider.daftarPengingat.map((r) {
+      final deadline = r.deadline != null
+          ? DateFormat('dd MMM yyyy, HH:mm').format(r.deadline!)
+          : 'Tanpa deadline';
+      return '${r.judul} | Kategori: ${r.kategori} | Prioritas: ${r.priorityLabel} (${r.priorityScore}) | Deadline: $deadline';
+    }).toList();
     Navigator.push(context, MaterialPageRoute(builder: (_) => AIChatScreen(tasks: daftarTugas)));
   }
 
@@ -57,6 +63,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final deskripsiController = TextEditingController();
     String lokasiStr = 'Mengambil lokasi...';
     DateTime? selectedDeadline;
+    String selectedCategory = TaskPriorityService.categories.first;
+    bool isAnalyzing = false;
     
     showDialog(
       context: context,
@@ -98,6 +106,25 @@ class _HomeScreenState extends State<HomeScreen> {
                     controller: deskripsiController,
                     maxLines: 3,
                     decoration: const InputDecoration(hintText: 'Tambah detail...'),
+                  ),
+                  const SizedBox(height: 15),
+                  DropdownButtonFormField<String>(
+                    value: selectedCategory,
+                    decoration: const InputDecoration(
+                      hintText: 'Pilih kategori tugas',
+                      prefixIcon: Icon(Icons.category_outlined, color: AppTheme.primary),
+                    ),
+                    items: TaskPriorityService.categories
+                        .map((category) => DropdownMenuItem(
+                              value: category,
+                              child: Text(category),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() => selectedCategory = value);
+                      }
+                    },
                   ),
                   const SizedBox(height: 15),
                   ListTile(
@@ -158,56 +185,56 @@ class _HomeScreenState extends State<HomeScreen> {
             actions: [
               TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
               ElevatedButton(
-                  onPressed: () async {
+                  onPressed: isAnalyzing ? null : () async {
                   if (judulController.text.isEmpty) {
                     SnackBarUtils.showError(context, 'Judul tidak boleh kosong!');
                     return;
                   }
-
-                  // Guard: reject past deadlines before saving
                   if (selectedDeadline != null && selectedDeadline!.isBefore(DateTime.now())) {
                     SnackBarUtils.showError(context, 'Tenggat waktu tidak boleh di masa lalu!');
                     return;
                   }
-                  
+                  setDialogState(() => isAnalyzing = true);
                   try {
-                    final selectedDate = DateTime.now().add(const Duration(seconds: 10));
+                    final priority = await AIService.analyzePriority(
+                      title: judulController.text,
+                      description: deskripsiController.text,
+                      category: selectedCategory,
+                      deadline: selectedDeadline,
+                    );
                     final pengingat = Pengingat(
                       idPengguna: idPengguna,
                       judul: judulController.text,
                       deskripsi: deskripsiController.text,
-                      waktu: selectedDate,
+                      waktu: DateTime.now().add(const Duration(seconds: 10)),
+                      kategori: selectedCategory,
                       lokasi: lokasiStr == 'Mengambil lokasi...' ? 'Lokasi tidak diketahui' : lokasiStr,
                       deadline: selectedDeadline,
+                      priorityScore: priority.score,
+                      priorityLabel: priority.label,
                     );
-                    
                     await Provider.of<PengingatProvider>(context, listen: false).tambahPengingat(pengingat);
-                    
-                    final notificationId = Random().nextInt(1000);
                     try {
-                      // Deadline notification — only if deadline is still in the future
                       if (selectedDeadline != null && selectedDeadline!.isAfter(DateTime.now())) {
                         final msg = await NotificationService.scheduleDeadlineNotifications(
-                          id: notificationId + 2000,
+                          id: Random().nextInt(1000) + 2000,
                           title: judulController.text,
                           deadline: selectedDeadline!,
                         );
-                        if (mounted) {
-                          SnackBarUtils.showSuccess(context, msg);
-                        }
+                        if (mounted) SnackBarUtils.showSuccess(context, msg);
                       }
                     } catch (e) {
                       debugPrint('Gagal menampilkan notifikasi: $e');
                     }
-                    
                     if (mounted) Navigator.pop(ctx);
                   } catch (e) {
-                    if (mounted) {
-                      SnackBarUtils.showError(context, 'Gagal menambahkan tugas: $e');
-                    }
+                    setDialogState(() => isAnalyzing = false);
+                    if (mounted) SnackBarUtils.showError(context, 'Gagal menambahkan tugas: $e');
                   }
                 },
-                child: const Text('Buat'),
+                child: isAnalyzing
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Text('Buat'),
               ),
             ],
           );
@@ -230,8 +257,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final daftarTerfilter = pengingatProvider.daftarPengingat.where((r) {
       return r.judul.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-             r.deskripsi.toLowerCase().contains(_searchQuery.toLowerCase());
-    }).toList();
+             r.deskripsi.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+             r.kategori.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+             r.priorityLabel.toLowerCase().contains(_searchQuery.toLowerCase());
+    }).toList()
+      ..sort((a, b) {
+        final scoreCompare = b.priorityScore.compareTo(a.priorityScore);
+        if (scoreCompare != 0) return scoreCompare;
+        if (a.deadline == null && b.deadline == null) return 0;
+        if (a.deadline == null) return 1;
+        if (b.deadline == null) return -1;
+        return a.deadline!.compareTo(b.deadline!);
+      });
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -390,6 +427,17 @@ class _ReminderCard extends StatelessWidget {
   final Pengingat pengingat;
   const _ReminderCard({super.key, required this.pengingat});
 
+  Color _priorityColor() {
+    switch (pengingat.priorityLabel) {
+      case 'Tinggi':
+        return Colors.redAccent;
+      case 'Sedang':
+        return Colors.orangeAccent;
+      default:
+        return AppTheme.secondary;
+    }
+  }
+
   void _showDetail(BuildContext context) {
     showDialog(
       context: context,
@@ -403,6 +451,23 @@ class _ReminderCard extends StatelessWidget {
           children: [
             Text(pengingat.deskripsi, style: const TextStyle(fontSize: 16)),
             const SizedBox(height: 20),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _InfoChip(
+                  icon: Icons.category_outlined,
+                  text: pengingat.kategori,
+                  color: AppTheme.secondary,
+                ),
+                _InfoChip(
+                  icon: Icons.auto_graph,
+                  text: 'Prioritas ${pengingat.priorityLabel}',
+                  color: _priorityColor(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
             Row(
               children: [
                 const Icon(Icons.location_on_outlined, size: 16, color: AppTheme.primary),
@@ -471,6 +536,23 @@ class _ReminderCard extends StatelessWidget {
                         pengingat.judul,
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: AppTheme.onSurface),
                       ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _InfoChip(
+                            icon: Icons.auto_graph,
+                            text: 'Prioritas ${pengingat.priorityLabel}',
+                            color: _priorityColor(),
+                          ),
+                          _InfoChip(
+                            icon: Icons.category_outlined,
+                            text: pengingat.kategori,
+                            color: AppTheme.secondary,
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 6),
                       Text(
                         pengingat.deskripsi,
@@ -528,6 +610,44 @@ class _ReminderCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final Color color;
+
+  const _InfoChip({
+    required this.icon,
+    required this.text,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }
