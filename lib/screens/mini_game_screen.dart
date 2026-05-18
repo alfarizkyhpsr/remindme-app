@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/app_theme.dart';
+import '../services/sensor_service.dart';
 
 class MiniGameScreen extends StatefulWidget {
   const MiniGameScreen({super.key});
@@ -16,6 +17,7 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
   static const int _maxMissedItems = 5;
   static const int _sessionSeconds = 30;
 
+  // ── Game state ─────────────────────────────────────────────────────────────
   int _score = 0;
   int _highScore = 0;
   int _missedItems = 0;
@@ -32,11 +34,49 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
   List<GameItem> _items = [];
   Timer? _timer;
 
+  // ── Gyro state ─────────────────────────────────────────────────────────────
+  bool _gyroEnabled = false;
+  StreamSubscription<double>? _gyroSub;
+
+  // Sensitivitas: gyro Y (rad/s) × nilai ini per event (~100Hz).
+  // 0.018 → bar menempuh full range dalam ~1.1 detik pada tilt 1 rad/s.
+  static const double _gyroSensitivity = 0.018;
+
   @override
   void initState() {
     super.initState();
     _loadHighScore();
   }
+
+  // ── Gyro helpers ───────────────────────────────────────────────────────────
+
+  void _startGyroListen() {
+    _gyroSub?.cancel();
+    _gyroSub = SensorService.onGyroRaw.listen((yRate) {
+      if (!_isPlaying) return;
+      setState(() {
+        // event.y positif = tilt kiri, negatif = tilt kanan
+        // Kita balik tanda supaya tilt kanan → bar ke kanan
+        _playerX = (_playerX - yRate * _gyroSensitivity).clamp(-1.0, 1.0);
+      });
+    });
+  }
+
+  void _stopGyroListen() {
+    _gyroSub?.cancel();
+    _gyroSub = null;
+  }
+
+  void _toggleGyro() {
+    setState(() => _gyroEnabled = !_gyroEnabled);
+    if (_gyroEnabled && _isPlaying) {
+      _startGyroListen();
+    } else {
+      _stopGyroListen();
+    }
+  }
+
+  // ── Score persistence ──────────────────────────────────────────────────────
 
   Future<void> _loadHighScore() async {
     final prefs = await SharedPreferences.getInstance();
@@ -48,17 +88,18 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
 
   Future<void> _saveHighScoreIfNeeded() async {
     if (_score <= _highScore) return;
-
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('mini_game_high_score', _score);
     if (!mounted) return;
-    setState(() {
-      _highScore = _score;
-    });
+    setState(() => _highScore = _score);
   }
+
+  // ── Game lifecycle ─────────────────────────────────────────────────────────
 
   void _startGame() {
     _timer?.cancel();
+    _stopGyroListen();
+
     setState(() {
       _score = 0;
       _missedItems = 0;
@@ -74,6 +115,9 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
       _feedbackText = null;
       _items = [];
     });
+
+    if (_gyroEnabled) _startGyroListen();
+
     _timer = Timer.periodic(const Duration(milliseconds: 50), (_) {
       _updateGame();
     });
@@ -87,9 +131,7 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
     var shouldEndGame = false;
 
     setState(() {
-      if (_tick % 20 == 0 && _timeLeft > 0) {
-        _timeLeft--;
-      }
+      if (_tick % 20 == 0 && _timeLeft > 0) _timeLeft--;
 
       if (_tick % 80 == 0) {
         _fallSpeed = min(_fallSpeed + 0.003, 0.05);
@@ -105,7 +147,6 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
           _handleCaughtItem(item);
           return true;
         }
-
         if (item.y > 1.0) {
           if (item.kind != ItemKind.distraksi) {
             missedThisTick++;
@@ -113,7 +154,6 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
           }
           return true;
         }
-
         return false;
       });
 
@@ -128,9 +168,7 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
       }
     });
 
-    if (shouldEndGame) {
-      _endGame();
-    }
+    if (shouldEndGame) _endGame();
   }
 
   void _handleCaughtItem(GameItem item) {
@@ -159,7 +197,6 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
   void _flashFeedback(String text, {required bool glow}) {
     _feedbackText = text;
     _showGlow = glow;
-
     Future.delayed(const Duration(milliseconds: 650), () {
       if (!mounted || !_isPlaying) return;
       setState(() {
@@ -173,6 +210,7 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
 
   void _endGame() {
     _timer?.cancel();
+    _stopGyroListen();
     _saveHighScoreIfNeeded();
     if (!mounted) return;
     setState(() {
@@ -185,8 +223,11 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _stopGyroListen();
     super.dispose();
   }
+
+  // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -199,14 +240,62 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
         ),
         backgroundColor: AppTheme.background,
         elevation: 0,
+        actions: [
+          // ── Toggle gyro ──────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: GestureDetector(
+              onTap: _toggleGyro,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _gyroEnabled
+                      ? AppTheme.secondary.withOpacity(0.15)
+                      : AppTheme.outline.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: _gyroEnabled
+                        ? AppTheme.secondary.withOpacity(0.4)
+                        : AppTheme.outline.withOpacity(0.2),
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.screen_rotation_alt_outlined,
+                      size: 16,
+                      color: _gyroEnabled ? AppTheme.secondary : AppTheme.outline,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      _gyroEnabled ? 'Gyro ON' : 'Gyro OFF',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: _gyroEnabled ? AppTheme.secondary : AppTheme.outline,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       body: GestureDetector(
-        onHorizontalDragUpdate: (details) {
-          setState(() {
-            _playerX += details.delta.dx / (MediaQuery.of(context).size.width / 2);
-            _playerX = _playerX.clamp(-1.0, 1.0);
-          });
-        },
+        // Drag hanya aktif saat gyro nonaktif
+        onHorizontalDragUpdate: _gyroEnabled
+            ? null
+            : (details) {
+                setState(() {
+                  _playerX += details.delta.dx /
+                      (MediaQuery.of(context).size.width / 2);
+                  _playerX = _playerX.clamp(-1.0, 1.0);
+                });
+              },
         child: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -221,6 +310,7 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
           ),
           child: Stack(
             children: [
+              // ── Pre-game / post-game screen ────────────────────────────
               if (!_isPlaying)
                 Center(
                   child: Padding(
@@ -257,7 +347,7 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
                         Text(
                           _score > 0 || _missedItems > 0
                               ? 'Sesi selesai. Skor kamu $_score.'
-                              : 'Kumpulkan Focus Point dan Task Boost. Jangan sentuh Distraksi.',
+                              : 'Kumpulkan Focus Point dan Task Boost.\nJangan sentuh Distraksi.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: AppTheme.onSurface.withOpacity(0.55),
@@ -275,7 +365,9 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
                         const SizedBox(height: 6),
                         Text(
                           'Durasi $_sessionSeconds detik • Maksimal lolos: $_maxMissedItems',
-                          style: TextStyle(color: AppTheme.onSurface.withOpacity(0.5)),
+                          style: TextStyle(
+                            color: AppTheme.onSurface.withOpacity(0.5),
+                          ),
                         ),
                         if (_score > 0 || _missedItems > 0) ...[
                           const SizedBox(height: 6),
@@ -288,6 +380,8 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
                           ),
                         ],
                         const SizedBox(height: 18),
+
+                        // ── Legend ─────────────────────────────────────────
                         Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
@@ -316,7 +410,77 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 16),
+
+                        // ── Gyro toggle card ───────────────────────────────
+                        GestureDetector(
+                          onTap: _toggleGyro,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 250),
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 18, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: _gyroEnabled
+                                  ? AppTheme.secondary.withOpacity(0.1)
+                                  : Colors.white.withOpacity(0.8),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: _gyroEnabled
+                                    ? AppTheme.secondary.withOpacity(0.35)
+                                    : AppTheme.outline.withOpacity(0.15),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.screen_rotation_alt_outlined,
+                                  color: _gyroEnabled
+                                      ? AppTheme.secondary
+                                      : AppTheme.outline,
+                                  size: 22,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Kontrol Gyroscope',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          color: _gyroEnabled
+                                              ? AppTheme.secondary
+                                              : AppTheme.onSurface,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      Text(
+                                        _gyroEnabled
+                                            ? 'Aktif — miringkan HP untuk gerakkan bar'
+                                            : 'Nonaktif — geser layar untuk gerakkan bar',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: AppTheme.onSurface
+                                              .withOpacity(0.5),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Switch(
+                                  value: _gyroEnabled,
+                                  onChanged: (_) => _toggleGyro(),
+                                  activeColor: AppTheme.secondary,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
                         ElevatedButton(
                           onPressed: _startGame,
                           style: ElevatedButton.styleFrom(
@@ -332,6 +496,8 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
                     ),
                   ),
                 ),
+
+              // ── In-game score display ──────────────────────────────────
               if (_isPlaying)
                 Positioned(
                   top: 20,
@@ -357,7 +523,9 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w800,
-                                color: _showGlow ? Colors.orangeAccent : Colors.redAccent,
+                                color: _showGlow
+                                    ? Colors.orangeAccent
+                                    : Colors.redAccent,
                               ),
                             ),
                           ),
@@ -365,6 +533,8 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
                     ),
                   ),
                 ),
+
+              // ── In-game stat pills ─────────────────────────────────────
               if (_isPlaying)
                 Positioned(
                   top: 110,
@@ -398,28 +568,71 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
                     ],
                   ),
                 ),
+
+              // ── Gyro active indicator (in-game) ────────────────────────
+              if (_isPlaying && _gyroEnabled)
+                Positioned(
+                  top: 155,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppTheme.secondary.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: AppTheme.secondary.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.screen_rotation_alt_outlined,
+                            size: 12,
+                            color: AppTheme.secondary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Gyro — miringkan HP',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.secondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+              // ── Falling items ──────────────────────────────────────────
               ..._items.map(
                 (item) => Align(
                   alignment: Alignment(item.x, item.y),
-                  child: Icon(
-                    item.icon,
-                    color: item.color,
-                    size: item.size,
-                  ),
+                  child: Icon(item.icon, color: item.color, size: item.size),
                 ),
               ),
+
+              // ── Player bar ─────────────────────────────────────────────
               Align(
                 alignment: Alignment(_playerX, 0.9),
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
+                  duration: const Duration(milliseconds: 80),
                   width: 92,
                   height: 14,
                   decoration: BoxDecoration(
-                    color: _showGlow ? Colors.orangeAccent : AppTheme.primary,
+                    color:
+                        _showGlow ? Colors.orangeAccent : AppTheme.primary,
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: (_showGlow ? Colors.orangeAccent : AppTheme.primary)
+                        color: (_showGlow
+                                ? Colors.orangeAccent
+                                : AppTheme.primary)
                             .withOpacity(0.38),
                         blurRadius: _showGlow ? 18 : 10,
                         offset: const Offset(0, 4),
@@ -436,16 +649,14 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
   }
 }
 
+// ── Supporting widgets ─────────────────────────────────────────────────────────
+
 class _StatPill extends StatelessWidget {
   final String text;
   final Color color;
   final IconData icon;
 
-  const _StatPill({
-    required this.text,
-    required this.color,
-    required this.icon,
-  });
+  const _StatPill({required this.text, required this.color, required this.icon});
 
   @override
   Widget build(BuildContext context) {
@@ -483,11 +694,7 @@ class _LegendRow extends StatelessWidget {
   final String label;
   final Color color;
 
-  const _LegendRow({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
+  const _LegendRow({required this.icon, required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -507,6 +714,8 @@ class _LegendRow extends StatelessWidget {
     );
   }
 }
+
+// ── Game model ─────────────────────────────────────────────────────────────────
 
 enum ItemKind { focus, boost, distraksi }
 

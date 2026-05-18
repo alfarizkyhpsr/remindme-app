@@ -7,7 +7,6 @@ class NotificationService {
   static final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
 
-  // Use explicit Jakarta location — avoids tz.local being UTC on device
   static tz.Location get _jakartaLocation => tz.getLocation('Asia/Jakarta');
 
   static const _channelId = 'reminder_channel';
@@ -26,39 +25,52 @@ class NotificationService {
     macOS: DarwinNotificationDetails(),
   );
 
-  // ─── Init ────────────────────────────────────────────────────────────────────
+  // ─── Init ─────────────────────────────────────────────────────────────────
 
-  static Future<void> init() async {
-    if (kIsWeb) {
-      debugPrint('[Notif] Web — skipping init.');
-      return;
-    }
-
-    const initAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initDarwin = DarwinInitializationSettings();
-    const initLinux = LinuxInitializationSettings(defaultActionName: 'Open');
-
-    await _notifications.initialize(
-      const InitializationSettings(
-        android: initAndroid,
-        iOS: initDarwin,
-        macOS: initDarwin,
-        linux: initLinux,
-      ),
-    );
-
-    final androidPlugin = _notifications
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-
-    final granted = await androidPlugin?.requestNotificationsPermission();
-    debugPrint('[Notif] POST_NOTIFICATIONS granted=$granted');
-
-    // Required for Android 14+ — requests SCHEDULE_EXACT_ALARM at runtime
-    await androidPlugin?.requestExactAlarmsPermission();
-    debugPrint('[Notif] Exact alarm permission requested.');
+static Future<void> init() async {
+  if (kIsWeb) {
+    debugPrint('[Notif] Web — skipping init.');
+    return;
   }
 
-  // ─── Immediate notification (for testing) ────────────────────────────────────
+  const initAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+  const initDarwin = DarwinInitializationSettings();
+  const initLinux = LinuxInitializationSettings(defaultActionName: 'Open');
+
+  await _notifications.initialize(
+    const InitializationSettings(
+      android: initAndroid,
+      iOS: initDarwin,
+      macOS: initDarwin,
+      linux: initLinux,
+    ),
+  );
+
+  // Semua dalam satu baris — jangan pisah generic type dengan newline
+  final androidPlugin = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+
+  final granted = await androidPlugin?.requestNotificationsPermission();
+  debugPrint('[Notif] POST_NOTIFICATIONS granted=$granted');
+
+  await androidPlugin?.requestExactAlarmsPermission();
+  debugPrint('[Notif] Exact alarm permission requested.');
+}
+
+  // ─── Cek apakah exact alarm tersedia ──────────────────────────────────────
+
+static Future<bool> _canScheduleExact() async {
+  if (kIsWeb) return false;
+
+  // Semua dalam satu baris — jangan pisah generic type dengan newline
+  final androidPlugin = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+
+  if (androidPlugin == null) return true;
+  final canSchedule = await androidPlugin.canScheduleExactAlarms();
+  debugPrint('[Notif] canScheduleExactAlarms=$canSchedule');
+  return canSchedule ?? false;
+}
+
+  // ─── Immediate notification ────────────────────────────────────────────────
 
   static Future<bool> showImmediateNotification({
     required String title,
@@ -75,21 +87,37 @@ class NotificationService {
     }
   }
 
-  // ─── Core scheduler using flutter_local_notifications zonedSchedule ──────────
+  // ─── Core scheduler ────────────────────────────────────────────────────────
 
-  static Future<bool> _schedule(int id, String title, String body, DateTime when) async {
+  static Future<bool> _schedule(
+      int id, String title, String body, DateTime when) async {
     if (kIsWeb) return false;
-    if (when.isBefore(DateTime.now())) {
+
+    final now = DateTime.now();
+    if (when.isBefore(now)) {
       debugPrint('[Notif] SKIP (past) id=$id  when=$when');
       return false;
     }
 
-    // Convert using the explicit Jakarta timezone — avoids tz.local UTC bug
-    final tzWhen = tz.TZDateTime.from(when, _jakartaLocation);
+    // FIX #1: Bangun TZDateTime dari komponen waktu secara eksplisit
+    // (bukan via .from() yang bergantung pada millisecondsSinceEpoch + timezone device)
+    // Ini memastikan "10:30 yang dipilih user" = "10:30 di Jakarta", titik.
+    final tzWhen = tz.TZDateTime(
+      _jakartaLocation,
+      when.year,
+      when.month,
+      when.day,
+      when.hour,
+      when.minute,
+      when.second,
+    );
 
     debugPrint('[Notif] Schedule id=$id  title="$title"');
-    debugPrint('[Notif]   now  = ${DateTime.now()}');
+    debugPrint('[Notif]   now  = $now');
     debugPrint('[Notif]   when = $tzWhen (${_jakartaLocation.name})');
+
+    // FIX #2: Cek apakah exact alarm bisa dijadwalkan
+    final canExact = await _canScheduleExact();
 
     try {
       await _notifications.zonedSchedule(
@@ -98,11 +126,18 @@ class NotificationService {
         body,
         tzWhen,
         _details,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        // FIX #3: Gunakan alarmClock — setara dengan alarm jam fisik,
+        // paling tepat waktu, menembus Doze mode, tidak perlu runtime permission
+        // di API 33+ (USE_EXACT_ALARM), cukup deklarasi di Manifest.
+        // Fallback ke exactAllowWhileIdle jika exact tidak tersedia.
+        androidScheduleMode: canExact
+            ? AndroidScheduleMode.alarmClock
+            : AndroidScheduleMode.inexactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
       );
-      debugPrint('[Notif] ✓ Scheduled id=$id');
+      debugPrint(
+          '[Notif] ✓ Scheduled id=$id  mode=${canExact ? "alarmClock" : "inexact"}');
       return true;
     } catch (e) {
       debugPrint('[Notif] ✗ Schedule FAILED id=$id: $e');
@@ -110,14 +145,7 @@ class NotificationService {
     }
   }
 
-  // ─── Deadline feature ────────────────────────────────────────────────────────
-  //
-  // Schedules up to 2 notifications:
-  //   • Urgent warning: fires 1 minute from now  (always, if deadline still future)
-  //   • Exact deadline: fires at the deadline moment
-  //
-  // The "1 minute from now" acts as an immediate confirmation that scheduling works,
-  // AND as the H-3 urgent ping when deadline < 3 days away.
+  // ─── Deadline feature ──────────────────────────────────────────────────────
 
   static Future<String> scheduleDeadlineNotifications({
     required int id,
@@ -126,14 +154,15 @@ class NotificationService {
   }) async {
     final now = DateTime.now();
     final formatted = DateFormat('dd MMM yyyy, HH:mm').format(deadline);
-    debugPrint('[Notif] scheduleDeadline  title="$title"  deadline=$deadline  now=$now');
+    debugPrint(
+        '[Notif] scheduleDeadline  title="$title"  deadline=$deadline  now=$now');
 
     if (deadline.isBefore(now)) {
       debugPrint('[Notif] Deadline already passed — nothing scheduled.');
       return 'Deadline sudah lewat, notifikasi tidak dijadwalkan.';
     }
 
-    // 1. Exact deadline notification
+    // 1. Notifikasi tepat saat deadline tiba
     final exactOk = await _schedule(
       id,
       '⏰ Deadline: $title',
@@ -141,12 +170,12 @@ class NotificationService {
       deadline,
     );
 
-    // 2. Warning notification
+    // 2. Notifikasi peringatan dini
     final threeDaysBefore = deadline.subtract(const Duration(days: 3));
     bool warningOk = false;
 
     if (threeDaysBefore.isAfter(now)) {
-      // Deadline is > 3 days away — schedule H-3 warning
+      // Deadline > 3 hari lagi — jadwalkan H-3
       warningOk = await _schedule(
         id + 10000,
         '📅 Pengingat Deadline: $title',
@@ -154,7 +183,7 @@ class NotificationService {
         threeDaysBefore,
       );
     } else {
-      // Deadline is < 3 days away — fire urgent warning in 1 minute
+      // Deadline < 3 hari — jadwalkan peringatan mendesak 1 menit dari sekarang
       warningOk = await _schedule(
         id + 10000,
         '🚨 Tugas Mendesak: $title',
@@ -163,8 +192,13 @@ class NotificationService {
       );
     }
 
-    final msg = 'Notifikasi deadline dijadwalkan untuk $formatted';
     debugPrint('[Notif] Result: exact=$exactOk  warning=$warningOk');
-    return msg;
+
+    // FIX #4: Beri tahu user jika exact alarm tidak tersedia
+    if (!exactOk && !warningOk) {
+      return 'Notifikasi gagal dijadwalkan. Buka Pengaturan → Aplikasi → RemindMe+ → Izin Alarm untuk mengaktifkan.';
+    }
+
+    return 'Notifikasi deadline dijadwalkan untuk $formatted';
   }
 }

@@ -353,11 +353,80 @@ class _HomeScreenState extends State<HomeScreen> {
                             addRepaintBoundaries: true,
                             addAutomaticKeepAlives: false,
                             itemBuilder: (context, index) {
-                              return _ReminderCard(
-                                key: ValueKey(daftarTerfilter[index].id),
-                                pengingat: daftarTerfilter[index],
-                              );
-                            },
+                            final pengingat = daftarTerfilter[index];
+                            return Dismissible(
+                              key: ValueKey(pengingat.id),
+                              direction: DismissDirection.endToStart,
+                              confirmDismiss: (_) async {
+                                return await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    backgroundColor: AppTheme.background,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    title: const Text(
+                                      'Hapus Tugas?',
+                                      style: TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                    content: Text(
+                                      '"${pengingat.judul}" akan dihapus secara permanen.',
+                                      style: TextStyle(color: AppTheme.onSurface.withOpacity(0.7)),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(ctx, false),
+                                        child: const Text('Batal'),
+                                      ),
+                                      ElevatedButton(
+                                        onPressed: () => Navigator.pop(ctx, true),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.redAccent,
+                                        ),
+                                        child: const Text('Hapus'),
+                                      ),
+                                    ],
+                                  ),
+                                ) ?? false;
+                              },
+                              onDismissed: (_) {
+                                Provider.of<PengingatProvider>(context, listen: false)
+                                    .hapusPengingat(pengingat.id!, pengingat.idPengguna);
+                                SnackBarUtils.showSuccess(
+                                  context,
+                                  '"${pengingat.judul}" berhasil dihapus.',
+                                );
+                              },
+                              background: Container(
+                                margin: const EdgeInsets.only(bottom: 16),
+                                decoration: BoxDecoration(
+                                  color: Colors.redAccent,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                alignment: Alignment.centerRight,
+                                padding: const EdgeInsets.only(right: 24),
+                                child: const Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.delete_outline, color: Colors.white, size: 28),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      'Hapus',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              child: _ReminderCard(
+                                key: ValueKey('card_${pengingat.id}'),
+                                pengingat: pengingat,
+                              ),
+                            );
+                          },
                           ),
                         ),
             ),

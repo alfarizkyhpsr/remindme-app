@@ -8,6 +8,10 @@ class SensorService {
   static final StreamController<double> _tiltController = StreamController<double>.broadcast();
   static Stream<double> get onTilt => _tiltController.stream;
 
+  // Raw gyro Y-axis stream untuk game (angular velocity dalam rad/s)
+  static final StreamController<double> _gyroRawController = StreamController<double>.broadcast();
+  static Stream<double> get onGyroRaw => _gyroRawController.stream;
+
   static void init() {
     int lastShakeTime = 0;
     int lastTiltTime = 0;
@@ -15,10 +19,10 @@ class SensorService {
     try {
       userAccelerometerEvents.listen((UserAccelerometerEvent event) {
         final now = DateTime.now().millisecondsSinceEpoch;
-        if (now - lastShakeTime < 500) return; // Throttle to 500ms
+        if (now - lastShakeTime < 500) return;
 
         double force = event.x.abs() + event.y.abs() + event.z.abs();
-        if (force > 15) { // Adjusted sensitivity for userAccelerometer
+        if (force > 15) {
           _shakeController.add(null);
           lastShakeTime = now;
         }
@@ -29,8 +33,12 @@ class SensorService {
 
     try {
       gyroscopeEvents.listen((GyroscopeEvent event) {
+        // Raw stream untuk game — emit setiap event tanpa throttle
+        _gyroRawController.add(event.y);
+
+        // Tilt detection tetap ada untuk HomeScreen
         final now = DateTime.now().millisecondsSinceEpoch;
-        if (now - lastTiltTime < 1000) return; // Throttle to 1s
+        if (now - lastTiltTime < 1000) return;
 
         if (event.y.abs() > 2.5) {
           _tiltController.add(event.y);
