@@ -65,7 +65,7 @@ static Future<bool> _canScheduleExact() async {
   final androidPlugin = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
 
   if (androidPlugin == null) return true;
-  final canSchedule = await androidPlugin.canScheduleExactAlarms();
+  final canSchedule = await androidPlugin.canScheduleExactNotifications();
   debugPrint('[Notif] canScheduleExactAlarms=$canSchedule');
   return canSchedule ?? false;
 }

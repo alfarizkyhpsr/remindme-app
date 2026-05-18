@@ -26,7 +26,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String _searchQuery = '';
   StreamSubscription? _shakeSub;
-  StreamSubscription? _tiltSub;
 
   @override
   void initState() {
@@ -35,9 +34,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _shakeSub = SensorService.onShake.listen((_) {
       SnackBarUtils.showSuccess(context, 'Goncangan terdeteksi! Memperbarui...');
       _refresh();
-    });
-    _tiltSub = SensorService.onTilt.listen((val) {
-      SnackBarUtils.showSuccess(context, 'Kemiringan terdeteksi: ${val > 0 ? "Kanan" : "Kiri"}');
     });
     WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
   }
@@ -246,7 +242,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _shakeSub?.cancel();
-    _tiltSub?.cancel();
     super.dispose();
   }
 

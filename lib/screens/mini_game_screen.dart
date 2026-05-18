@@ -55,9 +55,9 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
     _gyroSub = SensorService.onGyroRaw.listen((yRate) {
       if (!_isPlaying) return;
       setState(() {
-        // event.y positif = tilt kiri, negatif = tilt kanan
-        // Kita balik tanda supaya tilt kanan → bar ke kanan
-        _playerX = (_playerX - yRate * _gyroSensitivity).clamp(-1.0, 1.0);
+        // event.y positif = tilt kanan, negatif = tilt kiri
+        // +yRate: tilt kanan → bar ke kanan, tilt kiri → bar ke kiri
+        _playerX = (_playerX + yRate * _gyroSensitivity).clamp(-1.0, 1.0);
       });
     });
   }
