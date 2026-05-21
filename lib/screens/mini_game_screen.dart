@@ -232,13 +232,13 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: AppTheme.surface,
       appBar: AppBar(
         title: Text(
           'Focus Collector',
           style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
         ),
-        backgroundColor: AppTheme.background,
+        backgroundColor: AppTheme.surface,
         elevation: 0,
         actions: [
           // ── Toggle gyro ──────────────────────────────────────────────────
@@ -251,13 +251,13 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: _gyroEnabled
-                      ? AppTheme.secondary.withOpacity(0.15)
-                      : AppTheme.outline.withOpacity(0.08),
+                      ? AppTheme.secondary.withValues(alpha: 0.15)
+                      : AppTheme.outline.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: _gyroEnabled
-                        ? AppTheme.secondary.withOpacity(0.4)
-                        : AppTheme.outline.withOpacity(0.2),
+                        ? AppTheme.secondary.withValues(alpha: 0.4)
+                        : AppTheme.outline.withValues(alpha: 0.2),
                     width: 1.5,
                   ),
                 ),
@@ -300,9 +300,9 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                AppTheme.background,
+                AppTheme.surface,
                 const Color(0xFFFFF1D6),
-                AppTheme.secondary.withOpacity(0.08),
+                AppTheme.secondary.withValues(alpha: 0.08),
               ],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
@@ -313,19 +313,21 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
               // ── Pre-game / post-game screen ────────────────────────────
               if (!_isPlaying)
                 Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 28),
+                  child: SingleChildScrollView(
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Container(
                           padding: const EdgeInsets.all(22),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.92),
+                            color: Colors.white.withValues(alpha: 0.92),
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.orangeAccent.withOpacity(0.2),
+                                color: Colors.orangeAccent.withValues(alpha: 0.2),
                                 blurRadius: 22,
                                 offset: const Offset(0, 10),
                               ),
@@ -350,7 +352,7 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
                               : 'Kumpulkan Focus Point dan Task Boost.\nJangan sentuh Distraksi.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: AppTheme.onSurface.withOpacity(0.55),
+                            color: AppTheme.onSurface.withValues(alpha: 0.55),
                             height: 1.4,
                           ),
                         ),
@@ -366,7 +368,7 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
                         Text(
                           'Durasi $_sessionSeconds detik • Maksimal lolos: $_maxMissedItems',
                           style: TextStyle(
-                            color: AppTheme.onSurface.withOpacity(0.5),
+                            color: AppTheme.onSurface.withValues(alpha: 0.5),
                           ),
                         ),
                         if (_score > 0 || _missedItems > 0) ...[
@@ -385,7 +387,7 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
                         Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.8),
+                            color: Colors.white.withValues(alpha: 0.8),
                             borderRadius: BorderRadius.circular(18),
                           ),
                           child: const Column(
@@ -422,13 +424,13 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
                                 horizontal: 18, vertical: 14),
                             decoration: BoxDecoration(
                               color: _gyroEnabled
-                                  ? AppTheme.secondary.withOpacity(0.1)
-                                  : Colors.white.withOpacity(0.8),
+                                  ? AppTheme.secondary.withValues(alpha: 0.1)
+                                  : Colors.white.withValues(alpha: 0.8),
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
                                 color: _gyroEnabled
-                                    ? AppTheme.secondary.withOpacity(0.35)
-                                    : AppTheme.outline.withOpacity(0.15),
+                                    ? AppTheme.secondary.withValues(alpha: 0.35)
+                                    : AppTheme.outline.withValues(alpha: 0.15),
                                 width: 1.5,
                               ),
                             ),
@@ -464,7 +466,7 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: AppTheme.onSurface
-                                              .withOpacity(0.5),
+                                              .withValues(alpha: 0.5),
                                         ),
                                       ),
                                     ],
@@ -473,7 +475,7 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
                                 Switch(
                                   value: _gyroEnabled,
                                   onChanged: (_) => _toggleGyro(),
-                                  activeColor: AppTheme.secondary,
+                                  activeThumbColor: AppTheme.secondary,
                                 ),
                               ],
                             ),
@@ -496,40 +498,61 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
                     ),
                   ),
                 ),
+              ),
+            ),
 
               // ── In-game score display ──────────────────────────────────
               if (_isPlaying)
                 Positioned(
-                  top: 20,
+                  top: 0,
                   left: 0,
                   right: 0,
-                  child: Center(
-                    child: Column(
-                      children: [
-                        Text(
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Center(
+                        child: Text(
                           'Score: $_score',
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 54,
                             fontWeight: FontWeight.w900,
-                            color: AppTheme.primary.withOpacity(0.12),
+                            color: AppTheme.primary.withValues(alpha: 0.12),
                           ),
                         ),
-                        if (_feedbackText != null)
-                          AnimatedOpacity(
-                            opacity: _feedbackText == null ? 0 : 1,
-                            duration: const Duration(milliseconds: 180),
-                            child: Text(
-                              _feedbackText!,
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: _showGlow
-                                    ? Colors.orangeAccent
-                                    : Colors.redAccent,
-                              ),
-                            ),
-                          ),
-                      ],
+                      ),
+                    ),
+                  ),
+                ),
+                
+              // ── In-game feedback text ──────────────────────────────────
+              if (_isPlaying && _feedbackText != null)
+                Center(
+                  child: AnimatedOpacity(
+                    opacity: _feedbackText == null ? 0 : 1,
+                    duration: const Duration(milliseconds: 180),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (_showGlow ? Colors.orangeAccent : Colors.redAccent).withValues(alpha: 0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          )
+                        ]
+                      ),
+                      child: Text(
+                        _feedbackText!,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: _showGlow
+                              ? Colors.orangeAccent
+                              : Colors.redAccent,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -537,10 +560,11 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
               // ── In-game stat pills ─────────────────────────────────────
               if (_isPlaying)
                 Positioned(
-                  top: 110,
+                  top: 90,
                   left: 16,
                   right: 16,
-                  child: Row(
+                  child: SafeArea(
+                    child: Row(
                     children: [
                       Expanded(
                         child: _StatPill(
@@ -568,22 +592,24 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
                     ],
                   ),
                 ),
+              ),
 
               // ── Gyro active indicator (in-game) ────────────────────────
               if (_isPlaying && _gyroEnabled)
                 Positioned(
-                  top: 155,
+                  top: 135,
                   left: 0,
                   right: 0,
-                  child: Center(
+                  child: SafeArea(
+                    child: Center(
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: AppTheme.secondary.withOpacity(0.12),
+                        color: AppTheme.secondary.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(999),
                         border: Border.all(
-                          color: AppTheme.secondary.withOpacity(0.3),
+                          color: AppTheme.secondary.withValues(alpha: 0.3),
                         ),
                       ),
                       child: Row(
@@ -608,6 +634,7 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
                     ),
                   ),
                 ),
+              ),
 
               // ── Falling items ──────────────────────────────────────────
               ..._items.map(
@@ -618,8 +645,9 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
               ),
 
               // ── Player bar ─────────────────────────────────────────────
-              Align(
-                alignment: Alignment(_playerX, 0.9),
+              if (_isPlaying)
+                Align(
+                  alignment: Alignment(_playerX, 0.9),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 80),
                   width: 92,
@@ -633,7 +661,7 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
                         color: (_showGlow
                                 ? Colors.orangeAccent
                                 : AppTheme.primary)
-                            .withOpacity(0.38),
+                            .withValues(alpha: 0.38),
                         blurRadius: _showGlow ? 18 : 10,
                         offset: const Offset(0, 4),
                       ),
@@ -663,9 +691,9 @@ class _StatPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.92),
+        color: Colors.white.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.18)),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,

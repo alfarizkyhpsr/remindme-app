@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // Colors from Stitch "Candy Productivity"
-  static const Color background = Color(0xFFFFF8F7);
+  static const Color surface = Color(0xFFFFF8F7);
   static const Color primary = Color(0xFFAE2F34); // Coral Red
   static const Color primaryContainer = Color(0xFFFF6B6B);
   static const Color secondary = Color(0xFF006A65); // Teal
@@ -16,12 +16,12 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
         seedColor: primary,
-        background: background,
+        surface: surface,
         primary: primary,
         primaryContainer: primaryContainer,
         secondary: secondary,
         onSurface: onSurface,
-        surfaceVariant: surfaceVariant,
+        surfaceContainerHighest: surfaceVariant,
         outline: outline,
       ),
       textTheme: GoogleFonts.plusJakartaSansTextTheme().copyWith(
@@ -49,7 +49,7 @@ class AppTheme {
           elevation: 0,
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          side: BorderSide(color: primary.withOpacity(0.2), width: 1.5),
+          side: BorderSide(color: primary.withValues(alpha: 0.2), width: 1.5),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -61,7 +61,7 @@ class AppTheme {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: outline.withOpacity(0.3), width: 1.5),
+          borderSide: BorderSide(color: outline.withValues(alpha: 0.3), width: 1.5),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
@@ -73,7 +73,7 @@ class AppTheme {
         color: Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: outline.withOpacity(0.1), width: 1.5),
+          side: BorderSide(color: outline.withValues(alpha: 0.1), width: 1.5),
         ),
       ),
     );

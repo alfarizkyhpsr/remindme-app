@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:remindme/screens/home_screen.dart';
 import 'package:remindme/providers/auth_provider.dart';
 import 'package:remindme/providers/reminder_provider.dart';
-import 'package:remindme/models/user_model.dart';
 
 void main() {
   testWidgets('HomeScreen should display greeting and search bar', (WidgetTester tester) async {
@@ -13,7 +12,7 @@ void main() {
     final reminderProvider = PengingatProvider();
 
     // Mock Login
-    final testUser = Pengguna(id: 1, namaPengguna: 'Alfa', kataSandi: 'pass');
+    // final testUser = Pengguna(id: 1, namaPengguna: 'Alfa', kataSandi: 'pass');
     
     await tester.pumpWidget(
       MultiProvider(

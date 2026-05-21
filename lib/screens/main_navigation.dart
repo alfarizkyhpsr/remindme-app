@@ -50,7 +50,7 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
         onTap: (index) => setState(() => _currentIndex = index),
         backgroundColor: Colors.white,
         selectedItemColor: AppTheme.primary,
-        unselectedItemColor: AppTheme.outline.withOpacity(0.5),
+        unselectedItemColor: AppTheme.outline.withValues(alpha: 0.5),
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Beranda'),

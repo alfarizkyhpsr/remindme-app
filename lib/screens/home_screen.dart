@@ -1,3 +1,4 @@
+// ignore_for_file: use_build_context_synchronously
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -32,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     SensorService.init();
     _shakeSub = SensorService.onShake.listen((_) {
+      if (!mounted) return;
       SnackBarUtils.showSuccess(context, 'Goncangan terdeteksi! Memperbarui...');
       _refresh();
     });
@@ -86,7 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
           }
 
           return AlertDialog(
-            backgroundColor: AppTheme.background,
+            backgroundColor: AppTheme.surface,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             title: const Text('Pengingat Baru'),
             content: SingleChildScrollView(
@@ -105,7 +107,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 15),
                   DropdownButtonFormField<String>(
-                    value: selectedCategory,
+                    initialValue: selectedCategory,
                     decoration: const InputDecoration(
                       hintText: 'Pilih kategori tugas',
                       prefixIcon: Icon(Icons.category_outlined, color: AppTheme.primary),
@@ -130,7 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       selectedDeadline == null ? 'Set Tenggat Waktu (Opsional)' : 'Deadline: ${DateFormat('dd MMM yyyy, HH:mm').format(selectedDeadline!)}',
                       style: TextStyle(
                         fontSize: 14,
-                        color: selectedDeadline == null ? AppTheme.onSurface.withOpacity(0.5) : AppTheme.primary,
+                        color: selectedDeadline == null ? AppTheme.onSurface.withValues(alpha: 0.5) : AppTheme.primary,
                         fontWeight: selectedDeadline == null ? FontWeight.normal : FontWeight.bold,
                       ),
                     ),
@@ -150,6 +152,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           final picked = DateTime(date.year, date.month, date.day, time.hour, time.minute);
                           if (picked.isBefore(DateTime.now())) {
                             if (mounted) {
+                              if (!mounted) return;
                               SnackBarUtils.showError(context, 'Tenggat waktu tidak boleh di masa lalu!');
                             }
                           } else {
@@ -163,9 +166,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppTheme.primary.withOpacity(0.05),
+                      color: AppTheme.primary.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.primary.withOpacity(0.1)),
+                      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.1)),
                     ),
                     child: Row(
                       children: [
@@ -209,6 +212,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       priorityScore: priority.score,
                       priorityLabel: priority.label,
                     );
+                    if (!mounted) return;
                     await Provider.of<PengingatProvider>(context, listen: false).tambahPengingat(pengingat);
                     try {
                       if (selectedDeadline != null && selectedDeadline!.isAfter(DateTime.now())) {
@@ -266,40 +270,20 @@ class _HomeScreenState extends State<HomeScreen> {
       });
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: AppTheme.surface,
       appBar: AppBar(
-        backgroundColor: AppTheme.background,
+        backgroundColor: AppTheme.surface,
         elevation: 0,
         centerTitle: false,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Halo,', style: TextStyle(fontSize: 14, color: AppTheme.onSurface.withOpacity(0.5))),
+            Text('Halo,', style: TextStyle(fontSize: 14, color: AppTheme.onSurface.withValues(alpha: 0.5))),
             Text(pengguna?.namaPengguna ?? "Pengguna", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 24)),
           ],
         ),
         actions: [
-          // 🔔 DEBUG: Tap to send an immediate test notification
-          Padding(
-            padding: const EdgeInsets.only(right: 4),
-            child: IconButton(
-              tooltip: 'Test Notifikasi',
-              icon: const Icon(Icons.notifications_active_outlined, color: AppTheme.primary),
-              onPressed: () async {
-                final ok = await NotificationService.showImmediateNotification(
-                  title: '🔔 Test Notifikasi',
-                  body: 'Jika ini muncul, sistem notifikasi berfungsi dengan baik!',
-                );
-                if (mounted) {
-                  if (ok) {
-                    SnackBarUtils.showSuccess(context, 'Notifikasi dikirim! Cek status bar kamu.');
-                  } else {
-                    SnackBarUtils.showError(context, 'Gagal mengirim notifikasi. Cek izin aplikasi.');
-                  }
-                }
-              },
-            ),
-          ),
+
           Padding(
             padding: const EdgeInsets.only(right: 15),
             child: GestureDetector(
@@ -307,7 +291,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppTheme.primary.withOpacity(0.1),
+                  color: AppTheme.primary.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.auto_awesome, color: AppTheme.primary, size: 20),
@@ -329,7 +313,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 prefixIcon: const Icon(Icons.search, color: AppTheme.primary),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(15),
-                  borderSide: BorderSide(color: AppTheme.outline.withOpacity(0.1), width: 1.5),
+                  borderSide: BorderSide(color: AppTheme.outline.withValues(alpha: 0.1), width: 1.5),
                 ),
               ),
             ),
@@ -356,7 +340,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 return await showDialog<bool>(
                                   context: context,
                                   builder: (ctx) => AlertDialog(
-                                    backgroundColor: AppTheme.background,
+                                    backgroundColor: AppTheme.surface,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(20),
                                     ),
@@ -366,7 +350,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                     content: Text(
                                       '"${pengingat.judul}" akan dihapus secara permanen.',
-                                      style: TextStyle(color: AppTheme.onSurface.withOpacity(0.7)),
+                                      style: TextStyle(color: AppTheme.onSurface.withValues(alpha: 0.7)),
                                     ),
                                     actions: [
                                       TextButton(
@@ -453,7 +437,7 @@ class _SectionHeader extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: AppTheme.secondary.withOpacity(0.1),
+            color: AppTheme.secondary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(
@@ -475,11 +459,11 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.wb_sunny_outlined, size: 80, color: AppTheme.primary.withOpacity(0.2)),
+          Icon(Icons.wb_sunny_outlined, size: 80, color: AppTheme.primary.withValues(alpha: 0.2)),
           const SizedBox(height: 20),
           Text(
             'Belum ada tugas yang difokuskan.',
-            style: TextStyle(color: AppTheme.onSurface.withOpacity(0.4), fontWeight: FontWeight.w500),
+            style: TextStyle(color: AppTheme.onSurface.withValues(alpha: 0.4), fontWeight: FontWeight.w500),
           ),
         ],
       ),
@@ -506,7 +490,7 @@ class _ReminderCard extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.background,
+        backgroundColor: AppTheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(pengingat.judul, style: const TextStyle(fontWeight: FontWeight.bold)),
         content: Column(
@@ -578,7 +562,7 @@ class _ReminderCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppTheme.outline.withOpacity(0.1), width: 1.5),
+          border: Border.all(color: AppTheme.outline.withValues(alpha: 0.1), width: 1.5),
         ),
         child: IntrinsicHeight(
           child: Row(
@@ -620,7 +604,7 @@ class _ReminderCard extends StatelessWidget {
                       const SizedBox(height: 6),
                       Text(
                         pengingat.deskripsi,
-                        style: TextStyle(color: AppTheme.onSurface.withOpacity(0.6), fontSize: 14, height: 1.4),
+                        style: TextStyle(color: AppTheme.onSurface.withValues(alpha: 0.6), fontSize: 14, height: 1.4),
                       ),
                       if (pengingat.lokasi != null) ...[
                         const SizedBox(height: 12),
@@ -644,7 +628,7 @@ class _ReminderCard extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.redAccent.withOpacity(0.1),
+                            color: Colors.redAccent.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(
@@ -668,7 +652,7 @@ class _ReminderCard extends StatelessWidget {
                 onPressed: () {
                   Provider.of<PengingatProvider>(context, listen: false).hapusPengingat(pengingat.id!, pengingat.idPengguna);
                 },
-                icon: Icon(Icons.delete_outline, color: Colors.redAccent.withOpacity(0.3)),
+                icon: Icon(Icons.delete_outline, color: Colors.redAccent.withValues(alpha: 0.3)),
               ),
               const SizedBox(width: 8),
             ],
@@ -695,7 +679,7 @@ class _InfoChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(

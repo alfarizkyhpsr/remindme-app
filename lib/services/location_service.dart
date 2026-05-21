@@ -58,7 +58,7 @@ class LocationService {
             place.subLocality,
             place.locality,
             place.subAdministrativeArea,
-          ].where((part) => part != null && part!.trim().isNotEmpty).map((part) => part!.trim()).toList();
+          ].where((part) => part != null && part.trim().isNotEmpty).map((part) => part!.trim()).toList();
 
           if (formatted.isNotEmpty) {
             return formatted.join(', ');

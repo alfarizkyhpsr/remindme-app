@@ -13,7 +13,7 @@ class SensorService {
     int lastShakeTime = 0;
 
     try {
-      userAccelerometerEvents.listen((UserAccelerometerEvent event) {
+      userAccelerometerEventStream().listen((UserAccelerometerEvent event) {
         final now = DateTime.now().millisecondsSinceEpoch;
         if (now - lastShakeTime < 500) return;
 
@@ -28,7 +28,7 @@ class SensorService {
     }
 
     try {
-      gyroscopeEvents.listen((GyroscopeEvent event) {
+      gyroscopeEventStream().listen((GyroscopeEvent event) {
         // Raw stream untuk game — emit setiap event tanpa throttle
         _gyroRawController.add(event.y);
       });

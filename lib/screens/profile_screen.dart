@@ -1,3 +1,4 @@
+// ignore_for_file: use_build_context_synchronously
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -33,6 +34,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
       setState(() => _image = File(pickedFile.path));
+      if (!mounted) return;
       await Provider.of<AuthProvider>(context, listen: false).perbaruiFotoProfil(pickedFile.path);
     }
   }
@@ -43,10 +45,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final pengguna = auth.penggunaSaatIni;
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: AppTheme.surface,
       appBar: AppBar(
         title: Text('Pengaturan Akun', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
-        backgroundColor: AppTheme.background,
+        backgroundColor: AppTheme.surface,
         elevation: 0,
         centerTitle: false,
       ),
@@ -59,7 +61,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: AppTheme.outline.withOpacity(0.1), width: 1.5),
+                border: Border.all(color: AppTheme.outline.withValues(alpha: 0.1), width: 1.5),
               ),
               child: Column(
                 children: [
@@ -69,7 +71,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         CircleAvatar(
                           radius: 50,
-                          backgroundColor: AppTheme.primary.withOpacity(0.1),
+                          backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
                           backgroundImage: _image != null ? FileImage(_image!) : null,
                           child: _image == null ? const Icon(Icons.person_outline, size: 40, color: AppTheme.primary) : null,
                         ),
@@ -101,16 +103,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   Text(
                     'Pesan & Kesan Mata Kuliah TPM',
-                    style: TextStyle(color: AppTheme.onSurface.withOpacity(0.5), fontSize: 13, fontWeight: FontWeight.w500),
+                    style: TextStyle(color: AppTheme.onSurface.withValues(alpha: 0.5), fontSize: 13, fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 12),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppTheme.secondary.withOpacity(0.05),
+                      color: AppTheme.secondary.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(15),
-                      border: Border.all(color: AppTheme.secondary.withOpacity(0.1)),
+                      border: Border.all(color: AppTheme.secondary.withValues(alpha: 0.1)),
                     ),
                     child: Text(
                       'Teknologi Pemrograman Mobile, Mantap Betol!',
@@ -145,7 +147,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: AppTheme.primary.withOpacity(0.06),
+                                color: AppTheme.primary.withValues(alpha: 0.06),
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: const Text(
@@ -157,7 +159,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             SwitchListTile(
                               title: const Text('Gunakan Biometrik'),
                               value: auth.biometrikAktif,
-                              activeColor: AppTheme.primary,
+                              activeThumbColor: AppTheme.primary,
                               onChanged: (val) async {
                                 final message = await auth.setelBiometrik(val);
                                 if (!mounted) return;
@@ -169,6 +171,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         : 'Biometrik berhasil dinonaktifkan.',
                                   );
                                 } else {
+                                  if (!mounted) return;
                                   SnackBarUtils.showError(context, message);
                                 }
                                 setDialogState(() {});
@@ -243,7 +246,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _divider() => Divider(color: AppTheme.outline.withOpacity(0.05), height: 1);
+  Widget _divider() => Divider(color: AppTheme.outline.withValues(alpha: 0.05), height: 1);
 
   Widget _buildSection(String title, Widget content) {
     return Container(
@@ -252,7 +255,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppTheme.outline.withOpacity(0.1), width: 1.5),
+        border: Border.all(color: AppTheme.outline.withValues(alpha: 0.1), width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

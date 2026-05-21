@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import 'task_priority_service.dart';
 
 class AIService {
-  static const String _apiKey = 'AIzaSyDoPUvL7RsWRudBhoF2ksbb3TgA7nUm9Vo';
+  static const String _apiKey = 'AIzaSyBDv-aLXXqU8hNbM29UtUeijOeATMApHC4';
 
   static Future<String> getTaskSummary(List<String> tasks) async {
     if (tasks.isEmpty) return 'Belum ada tugas untuk dirangkum.';

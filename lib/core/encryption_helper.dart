@@ -2,8 +2,7 @@ import 'package:encrypt/encrypt.dart' as encrypt;
 
 class EncryptionHelper {
   static final _key = encrypt.Key.fromUtf8('my32lengthsupersecretnooneknows1'); // 32 chars
-  static final _iv = encrypt.IV.fromLength(16);
-  static final _encrypter = encrypt.Encrypter(encrypt.AES(_key));
+    static final _encrypter = encrypt.Encrypter(encrypt.AES(_key));
 
   static String encryptText(String text) {
     final iv = encrypt.IV.fromSecureRandom(16);

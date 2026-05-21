@@ -46,7 +46,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: AppTheme.surface,
       body: SafeArea(
         child: Column(
           children: [
@@ -65,9 +65,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         Container(
                           padding: const EdgeInsets.all(30),
                           decoration: BoxDecoration(
-                            color: data.color.withOpacity(0.1),
+                            color: data.color.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(40),
-                            border: Border.all(color: data.color.withOpacity(0.2), width: 2),
+                            border: Border.all(color: data.color.withValues(alpha: 0.2), width: 2),
                           ),
                           child: data.icon == Icons.rocket_launch
                               ? Image.asset('assets/app_icon.png', width: 100, height: 100)
@@ -89,7 +89,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 16,
-                            color: AppTheme.onSurface.withOpacity(0.6),
+                            color: AppTheme.onSurface.withValues(alpha: 0.6),
                             height: 1.6,
                           ),
                         ),
@@ -112,7 +112,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         width: _currentPage == index ? 24 : 8,
                         height: 8,
                         decoration: BoxDecoration(
-                          color: _currentPage == index ? AppTheme.primary : AppTheme.outline.withOpacity(0.2),
+                          color: _currentPage == index ? AppTheme.primary : AppTheme.outline.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),

@@ -9,12 +9,12 @@ import 'providers/reminder_provider.dart';
 import 'services/notification_service.dart';
 
 import 'package:timezone/data/latest.dart' as tz;
-import 'package:timezone/timezone.dart' as tzLib;
+import 'package:timezone/timezone.dart' as tz_lib;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   tz.initializeTimeZones();
-  tzLib.setLocalLocation(tzLib.getLocation('Asia/Jakarta'));
+  tz_lib.setLocalLocation(tz_lib.getLocation('Asia/Jakarta'));
   await NotificationService.init();
   
   final authProvider = AuthProvider();

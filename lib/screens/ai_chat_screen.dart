@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'dart:math';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -14,6 +15,7 @@ import '../providers/auth_provider.dart';
 import '../providers/reminder_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import '../services/notification_service.dart';
 
 class AIChatScreen extends StatefulWidget {
   final List<String> tasks;
@@ -75,7 +77,7 @@ class _AIChatScreenState extends State<AIChatScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.background,
+        backgroundColor: AppTheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Hapus Riwayat Chat?',
             style: TextStyle(fontWeight: FontWeight.bold)),
@@ -297,11 +299,25 @@ class _AIChatScreenState extends State<AIChatScreen> {
       lokasi: resolvedLocation,
     );
 
+    if (!mounted) return;
     await Provider.of<PengingatProvider>(context, listen: false)
         .tambahPengingat(pengingat);
 
-    if (!mounted) return;
-    SnackBarUtils.showSuccess(context, 'Jadwal AI berhasil ditambahkan ke beranda.');
+    try {
+      if (draft.scheduledAt.isAfter(DateTime.now())) {
+        final msg = await NotificationService.scheduleDeadlineNotifications(
+          id: Random().nextInt(1000) + 2000,
+          title: draft.title,
+          deadline: draft.scheduledAt,
+        );
+        if (mounted) SnackBarUtils.showSuccess(context, msg);
+      } else {
+        if (mounted) SnackBarUtils.showSuccess(context, 'Jadwal AI berhasil ditambahkan ke beranda.');
+      }
+    } catch (e) {
+      debugPrint('Gagal menampilkan notifikasi: $e');
+      if (mounted) SnackBarUtils.showSuccess(context, 'Jadwal AI berhasil ditambahkan ke beranda.');
+    }
   }
 
   void _scrollToBottom() {
@@ -321,9 +337,9 @@ class _AIChatScreenState extends State<AIChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: AppTheme.surface,
       appBar: AppBar(
-        backgroundColor: AppTheme.background,
+        backgroundColor: AppTheme.surface,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppTheme.primary),
@@ -349,7 +365,7 @@ class _AIChatScreenState extends State<AIChatScreen> {
             IconButton(
               tooltip: 'Hapus Riwayat Chat',
               icon: Icon(Icons.delete_sweep_outlined,
-                  color: AppTheme.outline.withOpacity(0.6)),
+                  color: AppTheme.outline.withValues(alpha: 0.6)),
               onPressed: _confirmClearHistory,
             ),
           const SizedBox(width: 4),
@@ -392,7 +408,7 @@ class _AIChatScreenState extends State<AIChatScreen> {
                       border: msg.isUser
                           ? null
                           : Border.all(
-                              color: AppTheme.outline.withOpacity(0.1),
+                              color: AppTheme.outline.withValues(alpha: 0.1),
                               width: 1.5,
                             ),
                     ),
@@ -422,10 +438,10 @@ class _AIChatScreenState extends State<AIChatScreen> {
               color: Colors.white,
               border: Border(
                   top: BorderSide(
-                      color: AppTheme.outline.withOpacity(0.1))),
+                      color: AppTheme.outline.withValues(alpha: 0.1))),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   offset: const Offset(0, -2),
                   blurRadius: 10,
                 )
@@ -440,13 +456,13 @@ class _AIChatScreenState extends State<AIChatScreen> {
                       decoration: InputDecoration(
                         hintText: 'Tanya seputar tugasmu...',
                         hintStyle: TextStyle(
-                            color: AppTheme.onSurface.withOpacity(0.5)),
+                            color: AppTheme.onSurface.withValues(alpha: 0.5)),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(24),
                           borderSide: BorderSide.none,
                         ),
                         filled: true,
-                        fillColor: AppTheme.background,
+                        fillColor: AppTheme.surface,
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 20, vertical: 12),
                       ),
@@ -586,18 +602,18 @@ class _HistoryBanner extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 16),
-      color: AppTheme.secondary.withOpacity(0.07),
+      color: AppTheme.secondary.withValues(alpha: 0.07),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.history, size: 14,
-              color: AppTheme.secondary.withOpacity(0.7)),
+              color: AppTheme.secondary.withValues(alpha: 0.7)),
           const SizedBox(width: 6),
           Text(
             'Melanjutkan percakapan sebelumnya',
             style: TextStyle(
               fontSize: 12,
-              color: AppTheme.secondary.withOpacity(0.8),
+              color: AppTheme.secondary.withValues(alpha: 0.8),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -682,9 +698,9 @@ class _ScheduleDraftCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppTheme.secondary.withOpacity(0.08),
+        color: AppTheme.secondary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.secondary.withOpacity(0.2)),
+        border: Border.all(color: AppTheme.secondary.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -708,7 +724,7 @@ class _ScheduleDraftCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(draft.description,
                 style: TextStyle(
-                    color: AppTheme.onSurface.withOpacity(0.75))),
+                    color: AppTheme.onSurface.withValues(alpha: 0.75))),
           ],
           const SizedBox(height: 10),
           Text('Kategori: ${draft.category}',

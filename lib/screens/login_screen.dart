@@ -52,6 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
       success = await auth.daftar(username, password);
       if (success) {
         setState(() => _isLogin = true);
+        if (!mounted) return;
         SnackBarUtils.showSuccess(context, 'Pendaftaran berhasil! Silakan masuk.');
         return;
       }
@@ -85,7 +86,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: AppTheme.surface,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -96,9 +97,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: AppTheme.primary.withOpacity(0.1),
+                    color: AppTheme.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppTheme.primary.withOpacity(0.2), width: 1.5),
+                    border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2), width: 1.5),
                   ),
                   child: Image.asset(
                     'assets/app_icon.png',
@@ -113,7 +114,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 Text(
                   _isLogin ? 'Selamat datang kembali!' : 'Mulai perjalanan fokusmu hari ini.',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: AppTheme.onSurface.withOpacity(0.6)),
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: AppTheme.onSurface.withValues(alpha: 0.6)),
                 ),
                 const SizedBox(height: 50),
                 TextField(
@@ -150,10 +151,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: AppTheme.primary.withOpacity(0.06),
+                      color: AppTheme.primary.withValues(alpha: 0.06),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: AppTheme.primary.withOpacity(0.12),
+                        color: AppTheme.primary.withValues(alpha: 0.12),
                       ),
                     ),
                     child: Column(
@@ -209,7 +210,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
                       decoration: BoxDecoration(
-                        border: Border.all(color: AppTheme.outline.withOpacity(0.2), width: 1.5),
+                        border: Border.all(color: AppTheme.outline.withValues(alpha: 0.2), width: 1.5),
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Row(
@@ -251,7 +252,7 @@ class _PasswordRule extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = passed ? AppTheme.secondary : AppTheme.onSurface.withOpacity(0.55);
+    final color = passed ? AppTheme.secondary : AppTheme.onSurface.withValues(alpha: 0.55);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),

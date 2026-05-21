@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'mini_game_screen.dart';
 import '../core/app_theme.dart';
@@ -59,6 +58,10 @@ class _ConversionScreenState extends State<ConversionScreen> {
       );
 
       if (response.statusCode == 200) {
+        if (!mounted) return;
+        final currentAmount = double.tryParse(_amountController.text) ?? 0;
+        if (currentAmount != amount) return;
+
         final data = json.decode(response.body);
         setState(() {
           _convertedAmount = (data['rates'][_toCurrency] as num).toDouble();
@@ -95,10 +98,10 @@ class _ConversionScreenState extends State<ConversionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: AppTheme.surface,
       appBar: AppBar(
         title: Text('Fitur & Produktivitas', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
-        backgroundColor: AppTheme.background,
+        backgroundColor: AppTheme.surface,
         elevation: 0,
         centerTitle: false,
       ),
@@ -139,12 +142,12 @@ class _ConversionScreenState extends State<ConversionScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(15),
                     decoration: BoxDecoration(
-                      color: AppTheme.primary.withOpacity(0.05),
+                      color: AppTheme.primary.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
                       children: [
-                        Text('Hasil Konversi', style: TextStyle(color: AppTheme.onSurface.withOpacity(0.5), fontSize: 12)),
+                        Text('Hasil Konversi', style: TextStyle(color: AppTheme.onSurface.withValues(alpha: 0.5), fontSize: 12)),
                         const SizedBox(height: 5),
                         _isLoading 
                           ? const SizedBox(
@@ -188,14 +191,14 @@ class _ConversionScreenState extends State<ConversionScreen> {
                   color: AppTheme.secondary,
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
-                    BoxShadow(color: AppTheme.secondary.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8)),
+                    BoxShadow(color: AppTheme.secondary.withValues(alpha: 0.3), blurRadius: 15, offset: const Offset(0, 8)),
                   ],
                 ),
                 child: Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
+                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
                       child: const Icon(Icons.sports_esports, color: Colors.white),
                     ),
                     const SizedBox(width: 20),
@@ -224,7 +227,7 @@ class _ConversionScreenState extends State<ConversionScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        border: Border.all(color: AppTheme.outline.withOpacity(0.2)),
+        border: Border.all(color: AppTheme.outline.withValues(alpha: 0.2)),
         borderRadius: BorderRadius.circular(10),
       ),
       child: DropdownButton<String>(
@@ -249,7 +252,7 @@ class _ConversionScreenState extends State<ConversionScreen> {
     );
   }
 
-  Widget _divider() => Divider(color: AppTheme.outline.withOpacity(0.05), height: 1);
+  Widget _divider() => Divider(color: AppTheme.outline.withValues(alpha: 0.05), height: 1);
 
   Widget _buildCard(String title, IconData icon, Color color, Widget content) {
     return Container(
@@ -258,7 +261,7 @@ class _ConversionScreenState extends State<ConversionScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.outline.withOpacity(0.1), width: 1.5),
+        border: Border.all(color: AppTheme.outline.withValues(alpha: 0.1), width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -1,3 +1,4 @@
+// ignore_for_file: use_build_context_synchronously
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -5,7 +6,6 @@ import 'package:provider/provider.dart';
 import '../core/app_theme.dart';
 import '../providers/auth_provider.dart';
 import 'onboarding_screen.dart';
-import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -36,10 +36,12 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (!hasSeenOnboarding) {
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const OnboardingScreen()));
+      if (!mounted) return;
       return;
     }
 
     final auth = Provider.of<AuthProvider>(context, listen: false);
+     if (!mounted) return;
     
     // Cek apakah sudah masuk (ada sesi)
     if (auth.sudahMasuk) {
@@ -51,23 +53,28 @@ class _SplashScreenState extends State<SplashScreen> {
           final berhasil = await auth.autentikasiBiometrik();
           if (berhasil) {
             Navigator.pushReplacementNamed(context, '/home');
+          if (!mounted) return;
           } else {
             // Jika gagal biometrik atau dibatalkan, lempar ke login
             await auth.keluar();
             Navigator.pushReplacementNamed(context, '/login');
+          if (!mounted) return;
           }
         } else {
           // Sesi kadaluarsa (> 15s) dan biometrik tidak aktif, paksa login ulang
           await auth.keluar();
           Navigator.pushReplacementNamed(context, '/login');
+        if (!mounted) return;
         }
       } else {
         // Kurang dari 15 detik, langsung masuk
         Navigator.pushReplacementNamed(context, '/home');
+      if (!mounted) return;
       }
     } else {
       // Belum ada sesi
       Navigator.pushReplacementNamed(context, '/login');
+    if (!mounted) return;
     }
   }
 
@@ -96,7 +103,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 height: 300,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withValues(alpha: 0.1),
                 ),
               ),
             ),
@@ -107,9 +114,9 @@ class _SplashScreenState extends State<SplashScreen> {
                   Container(
                     padding: const EdgeInsets.all(25),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(30),
-                      border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
                     ),
                     child: Image.asset(
                       'assets/app_icon.png',
@@ -131,7 +138,7 @@ class _SplashScreenState extends State<SplashScreen> {
                   Text(
                     'Dibuat untuk Produktivitas',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.8),
+                      color: Colors.white.withValues(alpha: 0.8),
                       fontWeight: FontWeight.w500,
                       letterSpacing: 1.2,
                     ),
@@ -145,7 +152,7 @@ class _SplashScreenState extends State<SplashScreen> {
               right: 0,
               child: Center(
                 child: SpinKitThreeBounce(
-                  color: Colors.white.withOpacity(0.6),
+                  color: Colors.white.withValues(alpha: 0.6),
                   size: 25.0,
                 ),
               ),

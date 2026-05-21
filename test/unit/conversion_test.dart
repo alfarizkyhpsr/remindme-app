@@ -17,12 +17,12 @@ class ConversionHelper {
 
   static double convert(double amount, String from, String to) {
     if (from == to) return amount;
-    String key = '${from}_${to}';
+    String key = '${from}_$to';
     if (rates.containsKey(key)) {
       return amount * rates[key]!;
     } else {
       double amountInUsd = from == 'USD' ? amount : amount * rates['${from}_USD']!;
-      return amountInUsd * rates['USD_${to}']!;
+      return amountInUsd * rates['USD_$to']!;
     }
   }
 

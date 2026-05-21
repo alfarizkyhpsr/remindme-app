@@ -1,5 +1,6 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 
@@ -20,6 +21,11 @@ class NotificationService {
       priority: Priority.high,
       playSound: true,
       enableVibration: true,
+      color: Color(0xFF00796B), // Beautiful teal color
+      ledColor: Color(0xFF00796B),
+      ledOnMs: 1000,
+      ledOffMs: 500,
+      styleInformation: DefaultStyleInformation(true, true),
     ),
     iOS: DarwinNotificationDetails(),
     macOS: DarwinNotificationDetails(),
