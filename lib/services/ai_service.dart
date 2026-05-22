@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import 'task_priority_service.dart';
 
 class AIService {
-  static const String _apiKey = 'AIzaSyBDv-aLXXqU8hNbM29UtUeijOeATMApHC4';
+  static const String _apiKey = 'AIzaSyBtHD-Q2tobjR6BjrQ4SkNoyUnHopQ_r_4';
 
   static Future<String> getTaskSummary(List<String> tasks) async {
     if (tasks.isEmpty) return 'Belum ada tugas untuk dirangkum.';
@@ -43,10 +43,46 @@ class AIService {
           'Kamu adalah sistem analisis prioritas tugas akademik. Waktu sekarang: $now. '
           'Judul: "$title". Deskripsi: "${description.isEmpty ? "Tidak ada" : description}". '
           'Kategori: "$category". Deadline: "$deadlineStr". '
-          'Panduan: Skor 75-100 = Tinggi (deadline <=24 jam atau ujian/presentasi/sidang). '
-          'Skor 45-74 = Sedang (deadline 1-7 hari atau tugas kuliah/laporan). '
-          'Skor 0-44 = Rendah (tidak ada deadline atau kategori pribadi/umum). '
-          'Balas HANYA dengan JSON: {"score": <0-100>, "label": "<Tinggi|Sedang|Rendah>"}';
+          '\n\n'
+          'ATURAN PENILAIAN SKOR (0-100):\n'
+          '1. DEADLINE (bobot terbesar):\n'
+          '   - Tidak ada deadline: +10\n'
+          '   - Lebih dari 2 minggu: +8\n'
+          '   - 8-14 hari lagi: +18\n'
+          '   - 4-7 hari lagi: +30\n'
+          '   - 2-3 hari lagi: +45\n'
+          '   - Besok atau dalam 24 jam: +55\n'
+          '\n'
+          '2. KATEGORI (bobot tambahan):\n'
+          '   - Ujian/Kuis: +22\n'
+          '   - Presentasi: +20\n'
+          '   - Revisi/Laporan: +18\n'
+          '   - Rapat/Kegiatan: +15\n'
+          '   - Tugas Kuliah: +14\n'
+          '   - Administrasi: +12\n'
+          '   - Umum: +10\n'
+          '   - Pribadi: +8\n'
+          '\n'
+          '3. KEYWORD di judul/deskripsi (maks +20):\n'
+          '   - Kata "darurat", "hari ini", "skripsi", "sidang", "ujian", "submit": tambah skor\n'
+          '\n'
+          '4. KOMPLEKSITAS deskripsi (maks +8):\n'
+          '   - Deskripsi >120 karakter: +8\n'
+          '   - 60-120 karakter: +5\n'
+          '   - 20-60 karakter: +3\n'
+          '\n'
+          'LABEL PRIORITAS:\n'
+          '- Skor 75-100 = "Tinggi" (deadline sangat dekat ATAU kategori kritis dengan deadline <3 hari)\n'
+          '- Skor 45-74 = "Sedang" (deadline 3-7 hari, atau kategori penting dengan deadline menengah)\n'
+          '- Skor 0-44 = "Rendah" (deadline jauh, tidak ada deadline, atau kategori ringan)\n'
+          '\n'
+          'CONTOH:\n'
+          '- "Presentasi Skripsi" deadline besok → ~75-85 (Tinggi)\n'
+          '- "Presentasi TPM" deadline 4 hari lagi → ~50-55 (Sedang)\n'
+          '- "Beli cemilan" tanpa deadline, kategori Pribadi → ~18-25 (Rendah)\n'
+          '\n'
+          'Hitung skor berdasarkan SEMUA faktor di atas, lalu balas HANYA dengan JSON:\n'
+          '{"score": <0-100>, "label": "<Tinggi|Sedang|Rendah>"}';
       final response = await model.generateContent([Content.text(prompt)]);
       final match = RegExp(r'\{[^}]+\}').firstMatch(response.text ?? '');
       if (match != null) {
